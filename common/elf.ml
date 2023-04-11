@@ -9,22 +9,22 @@
 
 let rec get_int_le bs a n =
   if n = 0 then 0 else
-    Char.code (Stdlib__bytes.get bs a) lor (get_int_le bs (a+1) (n-1) lsl 8);;
+    Char.code (Bytes.get bs a) lor (get_int_le bs (a+1) (n-1) lsl 8);;
 
 let load_elf =
   let load_file f =
     let ic = open_in f in
     let n = in_channel_length ic in
-    let s = Stdlib__bytes.create n in
+    let s = Bytes.create n in
     really_input ic s 0 n;
     close_in ic;
     s in
   let rec get_list bs a n =
-    if n = 0 then [] else Stdlib__bytes.get bs a :: get_list bs (a+1) (n-1) in
+    if n = 0 then [] else Bytes.get bs a :: get_list bs (a+1) (n-1) in
   let get_int_list bs a n = map Char.code (get_list bs a n) in
   let get_string bs a =
-    let rec len a n = if Stdlib__bytes.get bs a = '\x00' then n else len (a+1) (n+1) in
-    Stdlib__bytes.sub_string bs a (len a 0) in
+    let rec len a n = if Bytes.get bs a = '\x00' then n else len (a+1) (n+1) in
+    Bytes.sub_string bs a (len a 0) in
   fun arch reloc_type name ->
     let file = load_file name in
     if get_list file 0x0 4 <> ['\x7f'; 'E'; 'L'; 'F'] then
@@ -39,7 +39,7 @@ let load_elf =
       and shentsize = get_int_le file 0x3a 2
       and shnum = get_int_le file 0x3c 2 in
       Array.init shnum (fun i ->
-        Stdlib__bytes.sub file (shoff + i * shentsize) shentsize)
+        Bytes.sub file (shoff + i * shentsize) shentsize)
     and section_offset sec = get_int_le sec 0x18 8
     and section_len sec = get_int_le sec 0x20 8
     and section_link sec = get_int_le sec 0x28 4
@@ -47,7 +47,7 @@ let load_elf =
       if get_int_le sec 0x4 4 = ty then ()
       else failwith "unexpected section type" in
     let section_contents sec =
-      Stdlib__bytes.sub file (section_offset sec) (section_len sec)
+      Bytes.sub file (section_offset sec) (section_len sec)
     and get_string_from_sec sec_ndx =
       let off = section_offset sections.(sec_ndx) in
       fun i -> get_string file (off + i) in
@@ -113,21 +113,21 @@ let term_of_list_int,app_term_of_int_fun,term_of_int_fun =
   fun f start end_ -> app_term_of_int_fun f start end_ nil;;
 
 let term_of_bytes bs =
-  term_of_int_fun (Char.code o Stdlib__bytes.get bs) 0 (Stdlib__bytes.length bs);;
+  term_of_int_fun (Char.code o Bytes.get bs) 0 (Bytes.length bs);;
 let term_of_array bs =
   term_of_int_fun (Array.get bs) 0 (Array.length bs);;
 let array_of_bytes bs =
-  Array.init (Stdlib__bytes.length bs) (Char.code o Stdlib__bytes.get bs);;
+  Array.init (Bytes.length bs) (Char.code o Bytes.get bs);;
 
 let term_of_relocs reloc_fn (bs,rels) =
   let rec go = function
   | [], start ->
-    [], term_of_int_fun (Char.code o Stdlib__bytes.get bs) start (Stdlib__bytes.length bs)
+    [], term_of_int_fun (Char.code o Bytes.get bs) start (Bytes.length bs)
   | (ty,(off,sym,(add:int)))::ls, start ->
     let sym = mk_var(sym,`:num`) in
     let n, app = reloc_fn(bs,ty,off,sym,add) in
     let args, e = go (ls, off+n) in
     insert sym args,
-    app_term_of_int_fun (Char.code o Stdlib__bytes.get bs) start off (app e) in
+    app_term_of_int_fun (Char.code o Bytes.get bs) start off (app e) in
   let args, e = go (rels, 0) in
   `pc:num` :: args, e;;
