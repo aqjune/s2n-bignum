@@ -321,11 +321,12 @@ let decode = new_definition `!w:int32. decode w =
           if bit 2 immh then 2 else
           if bit 1 immh then 1 else 0 in
         let esize = 8 * (2 EXP highest_set_bit) in
-        let datasize = if q then 128 else 64 in
-        let elements = datasize DIV esize in
         let shift = (esize * 2) - val(word_join immh immb:(7)word) in
         // unsigned is true, round is false, accumulate is true
-        SOME (arm_USRA_VEC (QREG' Rd) (QREG' Rn) shift esize datasize)
+        if q then
+          SOME (arm_USRA_VEC (QREG' Rd) (QREG' Rn) shift esize (:128))
+        else
+          SOME (arm_USRA_VEC (QREG' Rd) (QREG' Rn) shift esize (:64))
     else NONE
 
   | [0:1; q; 0b001110:6; size:2; 0b1:1; Rm:5; 0b100111:6; Rn:5; Rd:5] ->
@@ -642,7 +643,7 @@ let PURE_DECODE_CONV =
       | _ -> failwith "constructors_of" in
       map (f o rand o snd o strip_forall) o
       conjuncts o lhand o snd o dest_forall o concl in
-    ["T";"F";",";"NONE";"SOME";"int_of_num"] @
+    ["T";"F";",";"NONE";"SOME";"int_of_num";"UNIV"] @
     ["XZR";"WZR";"SP";"WSP";"rvalue";"word";"iword"] @
     ["LSL"; "LSR"; "ASR"; "ROR"] @
     constructors_of offset_INDUCT @ ["Shiftedreg"; "Extendedreg"] @

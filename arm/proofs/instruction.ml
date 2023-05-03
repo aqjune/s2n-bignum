@@ -1187,8 +1187,10 @@ let arm_UMULH = define
         let d:N word = word((val n * val m) DIV (2 EXP dimindex(:N))) in
         (Rd := d) s`;;
 
+(* esize: the bitwidth of each element
+   dataszty: the bitwidth of Rd and Rn (either :64 or :128) *)
 let arm_USRA_VEC = define
- `arm_USRA_VEC Rd Rn shift esize datasize =
+ `arm_USRA_VEC2 Rd Rn shift esize dataszty =
     \s. let n:(128)word = read Rn s in
         let n:(128)word =
           if esize = 64 then usimd2 (\x. word_ushr x shift) n
@@ -1196,21 +1198,16 @@ let arm_USRA_VEC = define
           else if esize = 16 then usimd8 (\x. word_ushr x shift) n
           else usimd16 (\x. word_ushr x shift) n in
         let d:(128)word = read Rd s in
-        if datasize = 128 then
-          let d:(128)word =
-            if esize = 64 then simd2 word_add d n
-            else if esize = 32 then simd4 word_add d n
-            else if esize = 16 then simd8 word_add d n
-            else simd16 word_add d n in
-          (Rd := d) s
-        else // datasize = 64
-          let n:(64)word = word_subword n (0,64):(64)word in
-          let d:(64)word = word_subword d (0,64):(64)word in
-          let d:(64)word =
-            if esize = 32 then simd2 word_add d n
-            else if esize = 16 then simd4 word_add d n
-            else simd8 word_add d n in
-          (Rd := word_zx d:(128)word) s`;;
+        // truncate to dataszty
+        let datasz = dimindex(datasizety) in
+        let n:(dataszty)word = word_subword n (0,datasz):(dataszty)word in
+        let d:(dataszty)word = word_subword d (0,datasz):(dataszty)word in
+        let res:(dataszty)word =
+          if esize = datasz DIV 2 then simd2 word_add d n
+          else if esize = datasz DIV 4 then simd4 word_add d n
+          else if esize = datasz DIV 8 then simd8 word_add d n
+          else simd16 word_add d n in
+        (Rd := word_zx d:(128)word) s`;;
 
 let arm_UZIP1 = define
  `arm_UZIP1 Rd Rn Rm esize =
